@@ -69,7 +69,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     
     // 创建右键菜单
     hMenu = CreatePopupMenu();
-    AppendMenu(hMenu, MF_STRING, 1, L"退出");
+    AppendMenu(hMenu, MF_STRING, 1, "退出");
     
     // 启动WSL监控线程
     std::thread monitorThread(MonitorWslStatus);
