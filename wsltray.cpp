@@ -16,6 +16,7 @@ bool checkWSLStatus() {
 // 更新任务栏图标
 void updateIcon() {
     nid.hIcon = LoadIcon(NULL, wslRunning ? IDI_APPLICATION : IDI_ERROR);
+    strcpy(nid.szTip, wslRunning ? "WSL正在运行" : "WSL空闲中");
     Shell_NotifyIcon(NIM_MODIFY, &nid);
 }
 
