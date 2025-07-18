@@ -55,9 +55,9 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             Shell_NotifyIcon(NIM_ADD, &nid);
             
             hPopupMenu = CreatePopupMenu();
-            AppendMenu(hPopupMenu, MF_STRING, ID_TRAY_TOGGLE, L"Toggle WSL");
+            AppendMenu(hPopupMenu, MF_STRING, ID_TRAY_TOGGLE, "Toggle WSL");
             AppendMenu(hPopupMenu, MF_SEPARATOR, 0, NULL);
-            AppendMenu(hPopupMenu, MF_STRING, ID_TRAY_EXIT, L"Exit");
+            AppendMenu(hPopupMenu, MF_STRING, ID_TRAY_EXIT, "Exit");
             break;
             
         case WM_TRAYICON:
