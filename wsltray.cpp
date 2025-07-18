@@ -1,113 +1,76 @@
+
 #include <windows.h>
 #include <shellapi.h>
 #include <string>
 #include <cstdlib>
 
-#define ID_TRAY_APP_ICON 1
-#define ID_TRAY_EXIT 2
-#define ID_TRAY_TOGGLE 3
-#define WM_TRAYICON (WM_USER + 1)
-
 NOTIFYICONDATA nid;
-HICON hIconGreen, hIconRed;
-HMENU hPopupMenu;
+HWND hwnd;
 bool wslRunning = false;
 
-bool CheckWSLRunning() {
-    FILE* pipe = _popen("wsl --list --running", "r");
-    if (!pipe) return false;
-    
-    char buffer[128];
-    std::string result = "";
-    while (!feof(pipe)) {
-        if (fgets(buffer, 128, pipe) != NULL)
-            result += buffer;
-    }
-    _pclose(pipe);
-    return result.find("Ubuntu") != std::string::npos || 
-           result.find("Debian") != std::string::npos;
+// 检测WSL运行状态
+bool checkWSLStatus() {
+    return system("wsl -l --running > nul 2>&1") == 0;
 }
 
-void ToggleWSL() {
-    if (wslRunning) {
-        system("wsl --shutdown");
-    } else {
-        system("wsl -d Ubuntu");
-    }
-    wslRunning = !wslRunning;
-    nid.hIcon = wslRunning ? hIconGreen : hIconRed;
+// 更新任务栏图标
+void updateIcon() {
+    nid.hIcon = LoadIcon(NULL, wslRunning ? IDI_APPLICATION : IDI_ERROR);
     Shell_NotifyIcon(NIM_MODIFY, &nid);
 }
 
-LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-    switch (uMsg) {
+// 切换WSL状态
+void toggleWSL() {
+    if(wslRunning) {
+        system("wsl --shutdown");
+    } else {
+        system("wsl");
+    }
+    wslRunning = checkWSLStatus();
+    updateIcon();
+}
+
+LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    switch(msg) {
         case WM_CREATE:
-            hIconGreen = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(1));
-            hIconRed = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(2));
-            
-            nid.cbSize = sizeof(NOTIFYICONDATA);
+            nid = { sizeof(nid) };
             nid.hWnd = hwnd;
-            nid.uID = ID_TRAY_APP_ICON;
             nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
-            nid.uCallbackMessage = WM_TRAYICON;
-            nid.hIcon = hIconRed;
-            strcpy(nid.szTip, "WSL Monitor");
+            nid.uCallbackMessage = WM_APP;
+            strcpy(nid.szTip, "WSL状态监控");
+            updateIcon();
             Shell_NotifyIcon(NIM_ADD, &nid);
-            
-            hPopupMenu = CreatePopupMenu();
-            AppendMenu(hPopupMenu, MF_STRING, ID_TRAY_TOGGLE, "Toggle WSL");
-            AppendMenu(hPopupMenu, MF_SEPARATOR, 0, NULL);
-            AppendMenu(hPopupMenu, MF_STRING, ID_TRAY_EXIT, "Exit");
             break;
             
-        case WM_TRAYICON:
-            if (lParam == WM_RBUTTONUP) {
-                POINT pt;
-                GetCursorPos(&pt);
-                SetForegroundWindow(hwnd);
-                TrackPopupMenu(hPopupMenu, TPM_BOTTOMALIGN, pt.x, pt.y, 0, hwnd, NULL);
-            } else if (lParam == WM_LBUTTONUP) {
-                ToggleWSL();
+        case WM_APP:
+            if(lParam == WM_LBUTTONUP) {
+                toggleWSL();
             }
-            break;
-            
-        case WM_COMMAND:
-            if (LOWORD(wParam) == ID_TRAY_EXIT) {
-                Shell_NotifyIcon(NIM_DELETE, &nid);
-                PostQuitMessage(0);
-            } else if (LOWORD(wParam) == ID_TRAY_TOGGLE) {
-                ToggleWSL();
-            }
-            break;
-            
-        case WM_TIMER:
-            wslRunning = CheckWSLRunning();
-            nid.hIcon = wslRunning ? hIconGreen : hIconRed;
-            Shell_NotifyIcon(NIM_MODIFY, &nid);
             break;
             
         case WM_DESTROY:
+            Shell_NotifyIcon(NIM_DELETE, &nid);
             PostQuitMessage(0);
             break;
     }
-    return DefWindowProc(hwnd, uMsg, wParam, lParam);
+    return DefWindowProc(hwnd, msg, wParam, lParam);
 }
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+    wslRunning = checkWSLStatus();
+    
     WNDCLASS wc = {0};
-    wc.lpfnWndProc = WindowProc;
+    wc.lpfnWndProc = WndProc;
     wc.hInstance = hInstance;
-    wc.lpszClassName = "WSLTrayClass";
+    wc.lpszClassName = "WSLMonitor";
     RegisterClass(&wc);
     
-    HWND hwnd = CreateWindow("WSLTrayClass", "WSL Monitor", 0, 0, 0, 0, 0, NULL, NULL, hInstance, NULL);
-    SetTimer(hwnd, 1, 5000, NULL); // 每5秒检查一次WSL状态
+    hwnd = CreateWindow("WSLMonitor", NULL, 0, 0, 0, 0, 0, NULL, NULL, hInstance, NULL);
     
     MSG msg;
-    while (GetMessage(&msg, NULL, 0, 0)) {
+    while(GetMessage(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
-    
     return 0;
 }
