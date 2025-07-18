@@ -28,4 +28,4 @@ jobs:
       with:
         tag_name: 'wsltray'
         #body_path: release.txt
-        files: $env:GITHUB_PATH/*.exe
+        files: ${{env:GITHUB_PATH}}/*.exe
