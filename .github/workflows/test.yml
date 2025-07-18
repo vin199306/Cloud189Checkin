@@ -8,28 +8,23 @@ on:
 jobs:
   build:
     runs-on: windows-latest
- 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
- 
-    - name: Install MinGW-w64
+    - uses: actions/checkout@v3
+    
+    - name: Setup MinGW
       run: |
-        choco install mingw --version=latest --yes --allow-empty-checksums --no-progress --ignore-checksums --limit-output --no-checksums --no-progress --confirm
-        echo "C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-        echo "C:\ProgramData\chocolatey\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-        g++ --version  # 确认安装成功并打印版本信息
-      shell: pwsh  # 使用 PowerShell 运行脚本以安装 MinGW 和设置 PATH 环境变量
- 
-    - name: Build with MinGW-w64
-      run: g++ -o wsltray.exe wsltray.cpp  # 替换为你的 C++ 源文件名和输出文件名
+        choco install mingw -y
+        echo "D:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\bin" >> $GITHUB_PATH
+        
+    - name: Configure CMake
+      run: cmake -B build -G "MinGW Makefiles"
       
-    - name: Upload firmware to release
+    - name: Build
+      run: cmake --build build --config Release
+      
+    - name: Create Release
       uses: softprops/action-gh-release@v1
-      if: steps.tag.outputs.status == 'success' && !cancelled()
+      with:
+        files: build/*.exe
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ steps.tag.outputs.release_tag }}
-        body_path: release.txt
-        files: build/*.exe
