@@ -23,3 +23,10 @@ jobs:
  
     - name: Build with MinGW-w64
       run: g++ -o wsltray.exe wsltray.cpp  # 替换为你的 C++ 源文件名和输出文件名
+      
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: build/*.exe
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
