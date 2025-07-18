@@ -5,4 +5,4 @@ cmake_minimum_required(VERSION 3.20)
 project(wsltary)
 
 # 添加可执行文件
-add_executable(wsltary wsltary.cpp)
+#add_executable(wsltary wsltary.cpp)
