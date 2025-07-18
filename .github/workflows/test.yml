@@ -10,7 +10,7 @@ jobs:
     - name: Setup MinGW
       run: choco install mingw -y
     - name: Compile
-      run: g++ -finput-charset=utf-8 -fexec-charset=GBK wsltray.cpp -o wsltray.exe -static -lcomctl32 -lshlwapi
+      run: g++ -finput-charset=utf-8 -fexec-charset=GBK wsltray.cpp -o wsltray.exe -static -lcomctl32 -lshlwapi -lgdi32
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
