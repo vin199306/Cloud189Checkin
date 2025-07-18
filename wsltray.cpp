@@ -63,13 +63,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
     nid.uCallbackMessage = WM_USER + 1;
     nid.hIcon = hIconRed;
-    wcscpy_s(nid.szTip, L"WSL 未运行");
+    wcscpy_s(nid.szTip, "WSL 未运行");
     
     Shell_NotifyIcon(NIM_ADD, &nid);
     
     // 创建右键菜单
     hMenu = CreatePopupMenu();
-    AppendMenu(hMenu, MF_STRING, 1, L"退出");
+    AppendMenu(hMenu, MF_STRING, 1, "退出");
     
     // 启动WSL监控线程
     std::thread monitorThread(MonitorWslStatus);
@@ -176,7 +176,7 @@ void ToggleWsl() {
 
 void UpdateIcon() {
     nid.hIcon = wslRunning ? hIconGreen : hIconRed;
-    wcscpy_s(nid.szTip, wslRunning ? L"WSL 正在运行" : L"WSL 未运行");
+    wcscpy_s(nid.szTip, wslRunning ? "WSL 正在运行" : "WSL 未运行");
     Shell_NotifyIcon(NIM_MODIFY, &nid);
 }
 
