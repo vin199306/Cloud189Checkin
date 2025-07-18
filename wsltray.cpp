@@ -6,6 +6,7 @@
 #include <thread>
 #include <atomic>
 #include <chrono>
+#include <wchar.h>
 
 // 全局变量
 NOTIFYICONDATA nid;
