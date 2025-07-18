@@ -63,7 +63,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
     nid.uCallbackMessage = WM_USER + 1;
     nid.hIcon = hIconRed;
-    wcscpy_s(nid.szTip,100, L"WSL 未运行");
+    strcpy_s(nid.szTip,100, "WSL 未运行");
     
     Shell_NotifyIcon(NIM_ADD, &nid);
     
@@ -176,7 +176,7 @@ void ToggleWsl() {
 
 void UpdateIcon() {
     nid.hIcon = wslRunning ? hIconGreen : hIconRed;
-    wcscpy_s(nid.szTip, 100,wslRunning ? L"WSL 正在运行" : L"WSL 未运行");
+    strcpy_s(nid.szTip, 100,wslRunning ? "WSL 正在运行" : "WSL 未运行");
     Shell_NotifyIcon(NIM_MODIFY, &nid);
 }
 
