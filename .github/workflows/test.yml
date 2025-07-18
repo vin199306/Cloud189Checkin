@@ -19,4 +19,4 @@ jobs:
       shell: pwsh  # 使用 PowerShell 运行脚本以安装 MinGW 和设置 PATH 环境变量
  
     - name: Build with MinGW-w64
-      run: g++ -o your_program.exe your_program.cpp  # 替换为你的 C++ 源文件名和输出文件名
+      run: g++ -o wsltray.exe wsltray.cpp  # 替换为你的 C++ 源文件名和输出文件名
