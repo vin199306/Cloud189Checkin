@@ -1,8 +1,9 @@
 name: C++ CI with MinGW-w64
  
-on: 
+on:
+   workflow_dispatch:
    watch:
-       types: started
+     types: started
  
 jobs:
   build:
