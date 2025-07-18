@@ -9,14 +9,12 @@ jobs:
     - uses: actions/checkout@v3
     - name: Setup MinGW
       run: choco install mingw -y
-    - name: Configure CMake
-      run: cmake -B build -G "MinGW Makefiles"
-    - name: Build
-      run: cmake --build build --config Release
+    - name: Compile
+      run: g++ wsltray.cpp -o wsltray.exe -static -lcomctl32 -lshlwapi
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
         tag_name: 'wsltray'
-        files: build/*.exe
+        files: wsltray.exe
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
