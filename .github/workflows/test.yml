@@ -6,10 +6,11 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        arch: [arm64]
+        arch: [arm64, armeabi-v7a]
     steps:
       - uses: actions/checkout@v2
         with:
+          repository: bililive-go/bililive-go  # 指定仓库地址
           path: bililive-go
 
       - name: Set environment variables
