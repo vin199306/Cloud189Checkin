@@ -1,63 +1,76 @@
-name: Android Release
+name: Cloud check in action
 on:
   workflow_dispatch:
+  schedule:
+    - cron: 35 2 * * * 
 jobs:
-  build-android:
+  build-and-deploy:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        arch: [arm64, armeabi-v7a]
+    environment: user
     steps:
-      - uses: actions/checkout@v2
+      - name: 🔀 random delay 0-300 seconds
+        run: sleep $((RANDOM % 301))
+
+      - name: 🔌 Check out code
+        uses: actions/checkout@main
+
+      - name: 🔨 Setup Node.js environment
+        uses: actions/setup-node@main
         with:
-          repository: bililive-go/bililive-go  # 指定仓库地址
-          path: bililive-go
+          node-version: 18
+          cache: npm
 
-      - name: Set environment variables
-        working-directory: bililive-go
+      - name: 👾 Check if Debug is true
+        if: vars.debug == '1'
         run: |
-          echo "GIT_TAG=$(git describe --tags --abbrev=0)" >> $GITHUB_ENV
-          echo "ANDROID_NDK_VERSION=r25c" >> $GITHUB_ENV
-
-      - name: Set up Go
-        uses: actions/setup-go@v2
+          echo "CLOUD189_VERBOSE=1" >> $GITHUB_ENV
+      
+      - name: 📹 Restore cached Cookie
+        id: cache-cookie-restore
+        uses: actions/cache/restore@v4
         with:
-          go-version: 1.19
+          path: .token
+          key: ${{ runner.os }}-cache-token
+          restore-keys: ${{ runner.os }}-cache-token-
 
-      - name: Install Android NDK
-        working-directory: bililive-go
-        run: |
-          wget https://dl.google.com/android/repository/android-ndk-${{ env.ANDROID_NDK_VERSION }}-linux.zip
-          unzip -q android-ndk-${{ env.ANDROID_NDK_VERSION }}-linux.zip
-          echo "ANDROID_NDK_ROOT=$(pwd)/android-ndk-${{ env.ANDROID_NDK_VERSION }}" >> $GITHUB_ENV
-
-      - name: Build bililive-go for Android
-        working-directory: bililive-go
-        run: |
-          # 设置交叉编译环境
-          if [ "${{ matrix.arch }}" = "arm64" ]; then
-            export GOARCH=arm64
-            export ANDROID_ARCH=arm64-v8a
-          else
-            export GOARCH=arm
-            export GOARM=7
-            export ANDROID_ARCH=armeabi-v7a
-          fi
-
-          export GOOS=android
-          export CGO_ENABLED=0 # 不需要编译 FFmpeg，禁用 CGO
-          export CC=${{ env.ANDROID_NDK_ROOT }}/toolchains/llvm/prebuilt/linux-x86_64/bin/${GOARCH}-linux-android21-clang
-          export CXX=${{ env.ANDROID_NDK_ROOT }}/toolchains/llvm/prebuilt/linux-x86_64/bin/${GOARCH}-linux-android21-clang++
-
-          # 编译二进制文件
-          mkdir -p bin
-          go build -tags release \
-            -ldflags "-X github.com/bililive-go/bililive-go/src/consts.AppVersion=${{ env.GIT_TAG }}" \
-            -o bin/bililive-go-android-${{ matrix.arch }} \
-            ./src/cmd/bililive/
-
-      - name: Upload Android binaries to release
-        uses: softprops/action-gh-release@v1
+      - name: 🔧 Init secrets
+        uses: shine1594/secrets-to-env-action@master
         with:
-          files: bililive-go/bin/bililive-go-android-${{ matrix.arch }}
-          prerelease: ${{ contains(env.GIT_TAG, 'rc') }}
+          secrets: ${{ toJSON(secrets) }}
+          secrets_env: production
+          prefix_prod: ""
+          file_name_prod: .env
+
+      - name: 📡 Init dependencies
+        run: npm install
+
+      - name: 🚀 Run
+        uses: nick-fields/retry@master
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: npm start
+      
+      - name: 📹 Save cached Cookie
+        uses: actions/cache/save@v4
+        with:
+          path: .token
+          key: ${{ runner.os }}-cache-token-${{ hashFiles('.token/*.json') }}
+
+      - name: 🚗 Keep Running
+        if: github.event_name == 'schedule'
+        run: |
+          git config --local user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
+          git config --local user.name "${{ github.actor }}"
+          git remote set-url origin https://${{ github.actor }}:${{ github.token }}@github.com/${{ github.repository }}
+          git pull --rebase --autostash
+          git commit --allow-empty -m "Keep Running..."
+          git push
+
+      - name: 🎉 Delete old workflow run
+        uses: Mattraks/delete-workflow-runs@main
+        with:
+          token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          retain_days: 0
+          keep_minimum_runs: 50
