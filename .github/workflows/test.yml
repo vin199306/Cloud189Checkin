@@ -1,20 +1,104 @@
-name: C++ CI with MinGW-w64
- 
+name: Android Release
 on:
-   workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
 jobs:
-  build:
-    runs-on: windows-latest
+  build-android:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [arm64, armeabi-v7a]
     steps:
-    - uses: actions/checkout@v3
-    - name: Setup MinGW
-      run: choco install mingw -y
-    - name: Compile
-      run: g++ -finput-charset=utf-8 -fexec-charset=GBK wsltray.cpp -o wsltray.exe -static -lcomctl32 -lshlwapi -lgdi32
-    - name: Create Release
-      uses: softprops/action-gh-release@v1
-      with:
-        tag_name: 'wsltray'
-        files: wsltray.exe
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/checkout@v2
+
+      - name: Set environment variables
+        run: |
+          echo "GIT_TAG=$(git describe --tags --abbrev=0)" >> $GITHUB_ENV
+          echo "ANDROID_NDK_VERSION=r25c" >> $GITHUB_ENV
+          echo "FFMPEG_VERSION=5.1.3" >> $GITHUB_ENV
+
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.19
+
+      - name: Install Android NDK
+        run: |
+          wget https://dl.google.com/android/repository/android-ndk-${{ env.ANDROID_NDK_VERSION }}-linux.zip
+          unzip -q android-ndk-${{ env.ANDROID_NDK_VERSION }}-linux.zip
+          echo "ANDROID_NDK_ROOT=$(pwd)/android-ndk-${{ env.ANDROID_NDK_VERSION }}" >> $GITHUB_ENV
+
+      - name: Build FFmpeg for Android
+        run: |
+          # 克隆 FFmpeg 源码
+          git clone --branch n${{ env.FFMPEG_VERSION }} https://git.ffmpeg.org/ffmpeg.git ffmpeg
+          cd ffmpeg
+          
+          # 根据架构设置编译参数
+          if [ "${{ matrix.arch }}" = "arm64" ]; then
+            ARCH=arm64
+            CPU=armv8-a
+            TOOLCHAIN=${{ env.ANDROID_NDK_ROOT }}/toolchains/llvm/prebuilt/linux-x86_64
+            SYSROOT=$TOOLCHAIN/sysroot
+            CROSS_PREFIX=$TOOLCHAIN/bin/aarch64-linux-android-
+            CC=$TOOLCHAIN/bin/aarch64-linux-android21-clang
+            CXX=$TOOLCHAIN/bin/aarch64-linux-android21-clang++
+          else
+            ARCH=arm
+            CPU=armv7-a
+            TOOLCHAIN=${{ env.ANDROID_NDK_ROOT }}/toolchains/llvm/prebuilt/linux-x86_64
+            SYSROOT=$TOOLCHAIN/sysroot
+            CROSS_PREFIX=$TOOLCHAIN/bin/arm-linux-androideabi-
+            CC=$TOOLCHAIN/bin/armv7a-linux-androideabi21-clang
+            CXX=$TOOLCHAIN/bin/armv7a-linux-androideabi21-clang++
+          fi
+
+          # 配置并编译 FFmpeg
+          ./configure \
+            --prefix=../ffmpeg-android/${{ matrix.arch }} \
+            --target-os=android \
+            --arch=$ARCH \
+            --cpu=$CPU \
+            --sysroot=$SYSROOT \
+            --cross-prefix=$CROSS_PREFIX \
+            --cc=$CC \
+            --cxx=$CXX \
+            --enable-shared \
+            --disable-static \
+            --disable-doc \
+            --disable-programs
+          make -j$(nproc)
+          make install
+
+      - name: Build bililive-go for Android
+        run: |
+          # 设置交叉编译环境
+          if [ "${{ matrix.arch }}" = "arm64" ]; then
+            export GOARCH=arm64
+            export ANDROID_ARCH=arm64-v8a
+          else
+            export GOARCH=arm
+            export GOARM=7
+            export ANDROID_ARCH=armeabi-v7a
+          fi
+
+          export GOOS=android
+          export CGO_ENABLED=1
+          export CC=${{ env.ANDROID_NDK_ROOT }}/toolchains/llvm/prebuilt/linux-x86_64/bin/${GOARCH}-linux-android21-clang
+          export CXX=${{ env.ANDROID_NDK_ROOT }}/toolchains/llvm/prebuilt/linux-x86_64/bin/${GOARCH}-linux-android21-clang++
+          export LDFLAGS="-L$(pwd)/ffmpeg-android/${{ matrix.arch }}/lib"
+          export CFLAGS="-I$(pwd)/ffmpeg-android/${{ matrix.arch }}/include"
+
+          # 编译二进制文件
+          mkdir -p bin
+          go build -tags release \
+            -ldflags "-X github.com/bililive-go/bililive-go/src/consts.AppVersion=${{ env.GIT_TAG }}" \
+            -o bin/bililive-go-android-${{ matrix.arch }} \
+            ./src/cmd/bililive/
+
+      - name: Upload Android binaries to release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: bin/bililive-go-android-${{ matrix.arch }}
+          prerelease: ${{ contains(env.GIT_TAG, 'rc') }}
