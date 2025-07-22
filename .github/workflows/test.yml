@@ -1,24 +1,19 @@
 name: Android Release
 on:
-  push:
-    tags:
-      - 'v*'
-  workflow_dispatch:  # 支持手动触发
-
+  workflow_dispatch:
 jobs:
   build-android:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        arch: [arm64]  # 仅编译 arm64 架构
+        arch: [arm64]
     steps:
       - uses: actions/checkout@v2
 
       - name: Set environment variables
         run: |
-          echo "GIT_TAG=$(git describe --tags --abbrev=0 || echo 'dev')" >> $GITHUB_ENV
+          echo "GIT_TAG=$(git describe --tags --abbrev=0)" >> $GITHUB_ENV
           echo "ANDROID_NDK_VERSION=r25c" >> $GITHUB_ENV
-          echo "FFMPEG_VERSION=5.1.3" >> $GITHUB_ENV
 
       - name: Set up Go
         uses: actions/setup-go@v2
@@ -31,48 +26,22 @@ jobs:
           unzip -q android-ndk-${{ env.ANDROID_NDK_VERSION }}-linux.zip
           echo "ANDROID_NDK_ROOT=$(pwd)/android-ndk-${{ env.ANDROID_NDK_VERSION }}" >> $GITHUB_ENV
 
-      - name: Build FFmpeg for Android
-        run: |
-          # 克隆 FFmpeg 源码
-          git clone --branch n${{ env.FFMPEG_VERSION }} https://git.ffmpeg.org/ffmpeg.git ffmpeg
-          cd ffmpeg
-          
-          # 配置 arm64 编译参数
-          ARCH=arm64
-          CPU=armv8-a
-          TOOLCHAIN=${{ env.ANDROID_NDK_ROOT }}/toolchains/llvm/prebuilt/linux-x86_64
-          SYSROOT=$TOOLCHAIN/sysroot
-          CROSS_PREFIX=$TOOLCHAIN/bin/aarch64-linux-android-
-          CC=$TOOLCHAIN/bin/aarch64-linux-android21-clang
-          CXX=$TOOLCHAIN/bin/aarch64-linux-android21-clang++
-
-          # 配置并编译 FFmpeg
-          ./configure \
-            --prefix=../ffmpeg-android/${{ matrix.arch }} \
-            --target-os=android \
-            --arch=$ARCH \
-            --cpu=$CPU \
-            --sysroot=$SYSROOT \
-            --cross-prefix=$CROSS_PREFIX \
-            --cc=$CC \
-            --cxx=$CXX \
-            --enable-shared \
-            --disable-static \
-            --disable-doc \
-            --disable-programs
-          make -j$(nproc)
-          make install
-
       - name: Build bililive-go for Android
         run: |
-          # 设置 arm64 交叉编译环境
-          export GOARCH=arm64
+          # 设置交叉编译环境
+          if [ "${{ matrix.arch }}" = "arm64" ]; then
+            export GOARCH=arm64
+            export ANDROID_ARCH=arm64-v8a
+          else
+            export GOARCH=arm
+            export GOARM=7
+            export ANDROID_ARCH=armeabi-v7a
+          fi
+
           export GOOS=android
-          export CGO_ENABLED=1
-          export CC=${{ env.ANDROID_NDK_ROOT }}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang
-          export CXX=${{ env.ANDROID_NDK_ROOT }}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang++
-          export LDFLAGS="-L$(pwd)/ffmpeg-android/${{ matrix.arch }}/lib"
-          export CFLAGS="-I$(pwd)/ffmpeg-android/${{ matrix.arch }}/include"
+          export CGO_ENABLED=0 # 不需要编译 FFmpeg，禁用 CGO
+          export CC=${{ env.ANDROID_NDK_ROOT }}/toolchains/llvm/prebuilt/linux-x86_64/bin/${GOARCH}-linux-android21-clang
+          export CXX=${{ env.ANDROID_NDK_ROOT }}/toolchains/llvm/prebuilt/linux-x86_64/bin/${GOARCH}-linux-android21-clang++
 
           # 编译二进制文件
           mkdir -p bin
@@ -83,14 +52,6 @@ jobs:
 
       - name: Upload Android binaries to release
         uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')  # 仅在标签推送时上传到 Release
         with:
           files: bin/bililive-go-android-${{ matrix.arch }}
           prerelease: ${{ contains(env.GIT_TAG, 'rc') }}
-
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
-        if: ${{ github.event_name == 'workflow_dispatch' }}  # 手动触发时保存为临时 artifact
-        with:
-          name: bililive-go-android-${{ matrix.arch }}
-          path: bin/bililive-go-android-${{ matrix.arch }}
