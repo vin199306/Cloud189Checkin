@@ -89,7 +89,7 @@ jobs:
           prerelease: ${{ contains(env.GIT_TAG, 'rc') }}
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: ${{ github.event_name == 'workflow_dispatch' }}  # 手动触发时保存为临时 artifact
         with:
           name: bililive-go-android-${{ matrix.arch }}
